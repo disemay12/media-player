@@ -598,55 +598,47 @@
                 // Список iframe балансеров (работают внутри Telegram)
                 const playerSources = [];
                 
-                // 1. VidSrc - работает по IMDB/TMDB
-                if (media.imdb_id) {
+                // Определяем тип контента для URL
+                const isTV = media.type === 'tv' || media.type === 'series';
+                const contentType = isTV ? 'tv' : 'movie';
+                
+                // 1. VidSrc.to - основной источник
+                if (media.tmdb_id) {
                     playerSources.push({
                         source: 'VidSrc',
-                        iframeUrl: `https://vidsrc.xyz/embed/movie/${media.imdb_id}`
+                        iframeUrl: `https://vidsrc.to/embed/${contentType}/${media.tmdb_id}`
                     });
                 }
-                if (media.tmdb_id) {
+                
+                // 2. VidSrc.xyz
+                if (media.imdb_id) {
                     playerSources.push({
                         source: 'VidSrc2',
-                        iframeUrl: `https://vidsrc.to/embed/movie/${media.tmdb_id}`
+                        iframeUrl: `https://vidsrc.xyz/embed/${contentType}/${media.imdb_id}`
                     });
                 }
                 
-                // 2. 2embed
-                if (media.imdb_id) {
-                    playerSources.push({
-                        source: '2Embed',
-                        iframeUrl: `https://www.2embed.cc/embed/${media.imdb_id}`
-                    });
-                }
+                // 3. 2embed
                 if (media.tmdb_id) {
                     playerSources.push({
                         source: '2Embed',
-                        iframeUrl: `https://www.2embed.cc/embedtmdb/movie?id=${media.tmdb_id}`
+                        iframeUrl: `https://www.2embed.cc/embedtmdb/${contentType}?id=${media.tmdb_id}`
                     });
                 }
                 
-                // 3. SuperEmbed
-                if (media.imdb_id) {
+                // 4. SuperEmbed / MultiEmbed
+                if (media.tmdb_id) {
                     playerSources.push({
                         source: 'SuperEmbed',
-                        iframeUrl: `https://multiembed.mov/?video_id=${media.imdb_id}&tmdb=1`
+                        iframeUrl: `https://multiembed.mov/?video_id=${media.tmdb_id}&tmdb=1`
                     });
                 }
                 
-                // 4. NontonGo
+                // 5. Embedsu
                 if (media.tmdb_id) {
                     playerSources.push({
-                        source: 'NontonGo',
-                        iframeUrl: `https://www.nontongo.win/embed/movie/${media.tmdb_id}`
-                    });
-                }
-                
-                // 5. Smashystream
-                if (media.imdb_id) {
-                    playerSources.push({
-                        source: 'Smashy',
-                        iframeUrl: `https://player.smashy.stream/movie/${media.imdb_id}`
+                        source: 'EmbedSu',
+                        iframeUrl: `https://embed.su/embed/${contentType}/${media.tmdb_id}`
                     });
                 }
                 
@@ -654,15 +646,31 @@
                 if (media.tmdb_id) {
                     playerSources.push({
                         source: 'AutoEmbed',
-                        iframeUrl: `https://autoembed.co/movie/tmdb/${media.tmdb_id}`
+                        iframeUrl: `https://autoembed.co/${contentType}/tmdb/${media.tmdb_id}`
                     });
                 }
                 
-                // Если нет ID - пробуем по названию через databasegdriveplayer
+                // 7. MoviesAPI
+                if (media.tmdb_id) {
+                    playerSources.push({
+                        source: 'MoviesAPI',
+                        iframeUrl: `https://moviesapi.club/${contentType}/${media.tmdb_id}`
+                    });
+                }
+                
+                // Если нет TMDB ID но есть IMDB
+                if (playerSources.length === 0 && media.imdb_id) {
+                    playerSources.push({
+                        source: '2Embed',
+                        iframeUrl: `https://www.2embed.cc/embed/${media.imdb_id}`
+                    });
+                }
+                
+                // Если совсем нет ID - показываем сообщение
                 if (playerSources.length === 0) {
                     playerSources.push({
-                        source: 'DBGdrive',
-                        iframeUrl: `https://databasegdriveplayer.co/search.php?search=${encodeURIComponent(title)}`
+                        source: 'Поиск',
+                        iframeUrl: `https://www.google.com/search?q=${encodeURIComponent(title + ' смотреть онлайн')}&igu=1`
                     });
                 }
                 
@@ -707,10 +715,10 @@
                 'vidsrc2': '🎬',
                 '2embed': '📺',
                 'superembed': '🎥',
-                'nontongo': '📽️',
-                'smashy': '🎞️',
+                'embedsu': '📽️',
                 'autoembed': '▶️',
-                'dbgdrive': '💾'
+                'moviesapi': '🎞️',
+                'поиск': '🔍'
             };
             return icons[source.toLowerCase()] || '🎬';
         }
@@ -836,15 +844,19 @@
             // Auto-search from params
             const kpId = params.get('kp');
             const imdbId = params.get('imdb');
+            const tmdbId = params.get('tmdb');
             const title = params.get('title');
+            const mediaType = params.get('type') || 'movie';
             
-            if (kpId || imdbId || title) {
+            if (kpId || imdbId || tmdbId || title) {
                 const media = {
                     kinopoisk_id: kpId ? parseInt(kpId) : null,
                     imdb_id: imdbId,
+                    tmdb_id: tmdbId ? parseInt(tmdbId) : null,
                     title: title || 'Загрузка...',
-                    type: params.get('type') || 'movie'
+                    type: mediaType
                 };
+                console.log('Loading media:', media);
                 selectMedia(media);
             }
         })();
