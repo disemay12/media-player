@@ -519,8 +519,31 @@
             hideError();
             
             try {
-                const response = await fetch(`https://kinobox.tv/api/search?query=${encodeURIComponent(query)}`);
-                const data = await response.json();
+                // Пробуем Kinobox API
+                let data = [];
+                
+                try {
+                    const response = await fetch(`https://kinobox.tv/api/search?query=${encodeURIComponent(query)}`);
+                    const text = await response.text();
+                    
+                    // Проверяем, что это JSON
+                    if (text.startsWith('[') || text.startsWith('{')) {
+                        data = JSON.parse(text);
+                    }
+                } catch (e) {
+                    console.log('Kinobox search failed, trying direct player lookup');
+                }
+                
+                // Если Kinobox не вернул результаты, создаём заглушку для прямого поиска плеера
+                if (!data || data.length === 0) {
+                    data = [{
+                        title: query,
+                        year: '',
+                        type: 'movie',
+                        kinopoisk_id: null,
+                        imdb_id: null
+                    }];
+                }
                 
                 displaySearchResults(data);
             } catch (error) {
@@ -578,17 +601,46 @@
                 }
                 
                 const response = await fetch(url);
-                currentPlayers = await response.json();
+                const text = await response.text();
+                
+                // Проверяем, что это JSON
+                if (text.startsWith('[') || text.startsWith('{')) {
+                    currentPlayers = JSON.parse(text);
+                } else {
+                    currentPlayers = [];
+                }
                 
                 if (currentPlayers && currentPlayers.length > 0) {
                     displaySources(currentPlayers);
                     playSource(currentPlayers[0]);
                 } else {
-                    showError('Плееры не найдены для этого контента');
+                    // Пробуем альтернативные источники
+                    const altSources = [
+                        `https://kinobox.tv/api/players?title=${encodeURIComponent(media.title)}`,
+                    ];
+                    
+                    for (const altUrl of altSources) {
+                        if (altUrl === url) continue;
+                        try {
+                            const altResp = await fetch(altUrl);
+                            const altText = await altResp.text();
+                            if (altText.startsWith('[')) {
+                                currentPlayers = JSON.parse(altText);
+                                if (currentPlayers.length > 0) {
+                                    displaySources(currentPlayers);
+                                    playSource(currentPlayers[0]);
+                                    return;
+                                }
+                            }
+                        } catch (e) {}
+                    }
+                    
+                    showError('Плееры не найдены. Попробуйте другое название.');
                     playerPlaceholder.innerHTML = `
                         <span class="player-placeholder-icon">😕</span>
                         <p>Плееры не найдены</p>
                     `;
+                    playerPlaceholder.style.display = 'flex';
                 }
             } catch (error) {
                 showError('Ошибка загрузки плееров: ' + error.message);
