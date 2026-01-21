@@ -845,6 +845,7 @@
         
         // Init from URL params
         (function init() {
+            const fullUrl = window.location.href;
             const params = new URLSearchParams(window.location.search);
             
             // Auto-search from params
@@ -854,26 +855,48 @@
             const title = params.get('title');
             const mediaType = params.get('type') || 'movie';
             
-            console.log('URL params:', {kpId, imdbId, tmdbId, title, mediaType});
-            console.log('Full URL:', window.location.href);
+            // Показываем URL для отладки
+            console.log('Full URL:', fullUrl);
+            console.log('Params:', {kpId, imdbId, tmdbId, title, mediaType});
             
-            if (kpId || imdbId || tmdbId || title) {
+            // Если есть параметры - загружаем фильм
+            if (title || kpId || imdbId || tmdbId) {
+                const decodedTitle = title ? decodeURIComponent(title) : 'Загрузка...';
+                
                 const media = {
                     kinopoisk_id: kpId ? parseInt(kpId) : null,
                     imdb_id: imdbId || null,
                     tmdb_id: tmdbId ? parseInt(tmdbId) : null,
-                    title: decodeURIComponent(title || 'Загрузка...'),
+                    title: decodedTitle,
                     type: mediaType
                 };
+                
                 console.log('Loading media:', media);
                 
-                // Показываем что загружаем
-                document.getElementById('movieTitle').textContent = media.title;
-                document.getElementById('movieInfo').classList.add('active');
+                // Заполняем поле поиска названием
+                document.getElementById('searchInput').value = decodedTitle;
                 
+                // Сразу загружаем фильм
                 selectMedia(media);
             } else {
-                console.log('No params found, showing search');
+                // Показываем отладочную информацию
+                console.log('No params found');
+                console.log('Search string:', window.location.search);
+                
+                // Если URL содержит параметры после # (Telegram иногда так делает)
+                if (window.location.hash && window.location.hash.includes('?')) {
+                    const hashParams = new URLSearchParams(window.location.hash.split('?')[1]);
+                    const hashTitle = hashParams.get('title');
+                    if (hashTitle) {
+                        document.getElementById('searchInput').value = decodeURIComponent(hashTitle);
+                        selectMedia({
+                            title: decodeURIComponent(hashTitle),
+                            tmdb_id: hashParams.get('tmdb') ? parseInt(hashParams.get('tmdb')) : null,
+                            imdb_id: hashParams.get('imdb'),
+                            type: hashParams.get('type') || 'movie'
+                        });
+                    }
+                }
             }
         })();
     </script>
