@@ -589,52 +589,64 @@
             
             movieInfo.classList.add('active');
             
-            // Load players
+            // Load players - используем несколько источников
             try {
-                let url = 'https://kinobox.tv/api/players?';
-                if (media.kinopoisk_id) {
-                    url += `kinopoisk=${media.kinopoisk_id}`;
-                } else if (media.imdb_id) {
-                    url += `imdb=${media.imdb_id}`;
-                } else {
-                    url += `title=${encodeURIComponent(media.title)}`;
+                currentPlayers = [];
+                const title = media.title || '';
+                const kpId = media.kinopoisk_id;
+                
+                // Список источников плееров (iframe URL)
+                const playerSources = [];
+                
+                // 1. Alloha - популярный балансер
+                if (kpId) {
+                    playerSources.push({
+                        source: 'Alloha',
+                        iframeUrl: `https://api.alloha.tv/?kp=${kpId}`
+                    });
                 }
                 
-                const response = await fetch(url);
-                const text = await response.text();
+                // 2. Collaps - работает по названию
+                playerSources.push({
+                    source: 'Collaps',
+                    iframeUrl: `https://api.collaps.cc/movie?name=${encodeURIComponent(title)}`
+                });
                 
-                // Проверяем, что это JSON
-                if (text.startsWith('[') || text.startsWith('{')) {
-                    currentPlayers = JSON.parse(text);
-                } else {
-                    currentPlayers = [];
+                // 3. Videocdn
+                if (kpId) {
+                    playerSources.push({
+                        source: 'VideoCDN',
+                        iframeUrl: `https://videocdn.tv/api/short?api_token=YfTMaA4cCvjvHqQgrgBpCuDYzrgVJP4R&kinopoisk_id=${kpId}`
+                    });
                 }
                 
-                if (currentPlayers && currentPlayers.length > 0) {
+                // 4. HDVB
+                if (kpId) {
+                    playerSources.push({
+                        source: 'HDVB',
+                        iframeUrl: `https://hdvb.co/video?kp=${kpId}`
+                    });
+                }
+                
+                // 5. Kodik (по названию)
+                playerSources.push({
+                    source: 'Kodik',
+                    iframeUrl: `https://kodikapi.com/search?token=447d179e875efe44217f20d1ee2146be&title=${encodeURIComponent(title)}&with_episodes=true`
+                });
+                
+                // 6. VoKino
+                playerSources.push({
+                    source: 'VoKino',
+                    iframeUrl: `https://vokino.tv/search?q=${encodeURIComponent(title)}`
+                });
+                
+                currentPlayers = playerSources;
+                
+                if (currentPlayers.length > 0) {
                     displaySources(currentPlayers);
+                    // Пробуем первый плеер
                     playSource(currentPlayers[0]);
                 } else {
-                    // Пробуем альтернативные источники
-                    const altSources = [
-                        `https://kinobox.tv/api/players?title=${encodeURIComponent(media.title)}`,
-                    ];
-                    
-                    for (const altUrl of altSources) {
-                        if (altUrl === url) continue;
-                        try {
-                            const altResp = await fetch(altUrl);
-                            const altText = await altResp.text();
-                            if (altText.startsWith('[')) {
-                                currentPlayers = JSON.parse(altText);
-                                if (currentPlayers.length > 0) {
-                                    displaySources(currentPlayers);
-                                    playSource(currentPlayers[0]);
-                                    return;
-                                }
-                            }
-                        } catch (e) {}
-                    }
-                    
                     showError('Плееры не найдены. Попробуйте другое название.');
                     playerPlaceholder.innerHTML = `
                         <span class="player-placeholder-icon">😕</span>
@@ -667,10 +679,12 @@
             const icons = {
                 'alloha': '🎬',
                 'videocdn': '📺',
+                'videoCDN': '📺',
                 'kodik': '🎥',
                 'collaps': '🎞️',
                 'hdvb': '📽️',
-                'bazon': '🎦'
+                'bazon': '🎦',
+                'vokino': '🎦'
             };
             return icons[source.toLowerCase()] || '▶️';
         }
