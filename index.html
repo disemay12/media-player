@@ -598,34 +598,40 @@
                 // Список рабочих источников плееров
                 const playerSources = [];
                 
-                // 1. Rezka (HDRezka) - через зеркало
+                // 1. Rezka (HDRezka) - актуальное зеркало
                 playerSources.push({
                     source: 'HDRezka',
-                    iframeUrl: `https://hdrezka.ag/search/?do=search&subaction=search&q=${encodeURIComponent(title)}`
+                    iframeUrl: `https://hdrezka.me/search/?do=search&subaction=search&q=${encodeURIComponent(title)}`
                 });
                 
-                // 2. Kinoogo
+                // 2. Kinokrad
                 playerSources.push({
-                    source: 'Kinoogo',
-                    iframeUrl: `https://kinoogo.net/search/${encodeURIComponent(title)}`
+                    source: 'Kinokrad',
+                    iframeUrl: `https://kinokrad.co/search/${encodeURIComponent(title)}/`
                 });
                 
-                // 3. Lordfilm
+                // 3. Seasonvar (сериалы)
                 playerSources.push({
-                    source: 'Lordfilm',
-                    iframeUrl: `https://lordfilm.tw/search/${encodeURIComponent(title)}`
+                    source: 'Seasonvar',
+                    iframeUrl: `http://seasonvar.ru/search?q=${encodeURIComponent(title)}`
                 });
                 
-                // 4. Kinogo
+                // 4. Zona
                 playerSources.push({
-                    source: 'Kinogo',
-                    iframeUrl: `https://kinogo.fm/search/${encodeURIComponent(title)}`
+                    source: 'Zona',
+                    iframeUrl: `https://w1.zona.plus/search/${encodeURIComponent(title)}`
                 });
                 
-                // 5. Filmix
+                // 5. Кинопоиск (легальный)
                 playerSources.push({
-                    source: 'Filmix',
-                    iframeUrl: `https://filmix.fm/search/${encodeURIComponent(title)}`
+                    source: 'Кинопоиск',
+                    iframeUrl: `https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(title)}`
+                });
+                
+                // 6. YouTube трейлер
+                playerSources.push({
+                    source: 'YouTube',
+                    iframeUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' трейлер')}`
                 });
                 
                 currentPlayers = playerSources;
@@ -666,13 +672,13 @@
         function getSourceIcon(source) {
             const icons = {
                 'hdrezka': '🎬',
-                'kinoogo': '📺',
-                'lordfilm': '🎥',
-                'kinogo': '🎞️',
-                'filmix': '📽️',
-                'rezka': '🎬'
+                'kinokrad': '📺',
+                'seasonvar': '📺',
+                'zona': '🎥',
+                'кинопоиск': '⭐',
+                'youtube': '▶️'
             };
-            return icons[source.toLowerCase()] || '▶️';
+            return icons[source.toLowerCase()] || '🎬';
         }
         
         function playSource(player, btn) {
@@ -685,19 +691,25 @@
             document.querySelectorAll('.source-btn').forEach(b => b.classList.remove('active'));
             if (btn) btn.classList.add('active');
             
-            // Load player
-            playerPlaceholder.style.display = 'none';
+            // Показываем информацию о выбранном источнике
+            playerPlaceholder.style.display = 'flex';
+            playerPlaceholder.innerHTML = `
+                <span class="player-placeholder-icon">🎬</span>
+                <p style="margin-bottom: 15px;">Нажмите кнопку для открытия</p>
+                <a href="${player.iframeUrl}" target="_blank" 
+                   style="background: var(--accent-color); color: white; padding: 15px 30px; 
+                          border-radius: 10px; text-decoration: none; font-weight: bold;
+                          display: inline-block;">
+                    ▶️ Открыть ${player.source}
+                </a>
+                <p style="margin-top: 15px; font-size: 12px; color: var(--text-secondary);">
+                    Откроется в новой вкладке
+                </p>
+            `;
             
-            // Remove old iframe
+            // Remove old iframe if any
             const oldIframe = playerContainer.querySelector('iframe');
             if (oldIframe) oldIframe.remove();
-            
-            // Create new iframe
-            const iframe = document.createElement('iframe');
-            iframe.src = player.iframeUrl;
-            iframe.allowFullscreen = true;
-            iframe.allow = 'autoplay; fullscreen; encrypted-media';
-            playerContainer.appendChild(iframe);
         }
         
         // Favorites
