@@ -601,52 +601,54 @@
                 // Определяем тип контента
                 const isTV = media.type === 'tv' || media.type === 'series';
                 const kpId = media.kinopoisk_id;
+                const tmdbId = media.tmdb_id;
+                const imdbId = media.imdb_id;
+                
+                console.log('Building players for:', {kpId, tmdbId, imdbId, title, isTV});
+                
+                // === АНГЛИЙСКИЕ EMBED ПЛЕЕРЫ (по TMDB/IMDB) ===
+                // Работают стабильно, есть русские субтитры
+                
+                if (tmdbId) {
+                    const contentType = isTV ? 'tv' : 'movie';
+                    
+                    playerSources.push({
+                        source: 'VidSrc',
+                        iframeUrl: `https://vidsrc.to/embed/${contentType}/${tmdbId}`
+                    });
+                    
+                    playerSources.push({
+                        source: 'Embed',
+                        iframeUrl: `https://embed.su/embed/${contentType}/${tmdbId}`
+                    });
+                    
+                    playerSources.push({
+                        source: 'SuperEmbed',
+                        iframeUrl: `https://multiembed.mov/?video_id=${tmdbId}&tmdb=1`
+                    });
+                }
+                
+                if (imdbId) {
+                    playerSources.push({
+                        source: '2Embed',
+                        iframeUrl: `https://www.2embed.cc/embed/${imdbId}`
+                    });
+                }
                 
                 // === РУССКИЕ ИСТОЧНИКИ (по Kinopoisk ID) ===
-                
-                // 1. Kinobase - публичный iframe
                 if (kpId) {
                     playerSources.push({
                         source: 'Kinobase',
                         iframeUrl: `https://kinobase.org/embed/${kpId}`
                     });
-                }
-                
-                // 2. CDNmovies - работает без токена
-                if (kpId) {
-                    playerSources.push({
-                        source: 'CDNmovies',
-                        iframeUrl: `https://cdnmovies.net/api/iframe/${kpId}`
-                    });
-                }
-                
-                // 3. Videoframe
-                if (kpId) {
+                    
                     playerSources.push({
                         source: 'VideoFrame',
                         iframeUrl: `https://videoframe.space/embed/${kpId}`
                     });
                 }
                 
-                // 4. Kinoprofi
-                if (kpId) {
-                    playerSources.push({
-                        source: 'KinoProfi',
-                        iframeUrl: `https://kinoprofi.vip/embed/kp/${kpId}`
-                    });
-                }
-                
-                // 5. HDVB без токена
-                if (kpId) {
-                    playerSources.push({
-                        source: 'HDVB',
-                        iframeUrl: `https://vid1732386508.vb17120ayeshas.pw/embed/${kpId}`
-                    });
-                }
-                
                 // === ССЫЛКИ НА САЙТЫ (открываются в новой вкладке) ===
-                // Эти варианты как fallback - откроют страницу поиска
-                
                 playerSources.push({
                     source: 'HDRezka',
                     iframeUrl: `https://hdrezka.ag/search/?do=search&subaction=search&q=${encodeURIComponent(title)}`,
@@ -658,6 +660,8 @@
                     iframeUrl: `https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(title)}`,
                     external: true
                 });
+                
+                console.log('Player sources:', playerSources.length);
                 
                 currentPlayers = playerSources;
                 
@@ -696,13 +700,14 @@
         
         function getSourceIcon(source) {
             const icons = {
-                'kinobase': '🎬',
-                'cdnmovies': '📺',
-                'videoframe': '🎥',
-                'kinoprofi': '⭐',
-                'hdvb': '📽️',
+                'vidsrc': '🎬',
+                'embed': '📺',
+                'superembed': '🎥',
+                '2embed': '📽️',
+                'kinobase': '🇷🇺',
+                'videoframe': '🇷🇺',
                 'hdrezka': '🔥',
-                'кинопоиск': '🎦'
+                'кинопоиск': '⭐'
             };
             return icons[source.toLowerCase()] || '▶️';
         }
@@ -849,16 +854,26 @@
             const title = params.get('title');
             const mediaType = params.get('type') || 'movie';
             
+            console.log('URL params:', {kpId, imdbId, tmdbId, title, mediaType});
+            console.log('Full URL:', window.location.href);
+            
             if (kpId || imdbId || tmdbId || title) {
                 const media = {
                     kinopoisk_id: kpId ? parseInt(kpId) : null,
-                    imdb_id: imdbId,
+                    imdb_id: imdbId || null,
                     tmdb_id: tmdbId ? parseInt(tmdbId) : null,
-                    title: title || 'Загрузка...',
+                    title: decodeURIComponent(title || 'Загрузка...'),
                     type: mediaType
                 };
                 console.log('Loading media:', media);
+                
+                // Показываем что загружаем
+                document.getElementById('movieTitle').textContent = media.title;
+                document.getElementById('movieInfo').classList.add('active');
+                
                 selectMedia(media);
+            } else {
+                console.log('No params found, showing search');
             }
         })();
     </script>
