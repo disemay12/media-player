@@ -589,50 +589,82 @@
             
             movieInfo.classList.add('active');
             
-            // Load players - используем рабочие источники
+            // Load players - используем iframe балансеры
             try {
                 currentPlayers = [];
                 const title = media.title || '';
                 const kpId = media.kinopoisk_id;
                 
-                // Список рабочих источников плееров
+                // Список iframe балансеров (работают внутри Telegram)
                 const playerSources = [];
                 
-                // 1. Rezka (HDRezka) - актуальное зеркало
-                playerSources.push({
-                    source: 'HDRezka',
-                    iframeUrl: `https://hdrezka.me/search/?do=search&subaction=search&q=${encodeURIComponent(title)}`
-                });
+                // 1. VidSrc - работает по IMDB/TMDB
+                if (media.imdb_id) {
+                    playerSources.push({
+                        source: 'VidSrc',
+                        iframeUrl: `https://vidsrc.xyz/embed/movie/${media.imdb_id}`
+                    });
+                }
+                if (media.tmdb_id) {
+                    playerSources.push({
+                        source: 'VidSrc2',
+                        iframeUrl: `https://vidsrc.to/embed/movie/${media.tmdb_id}`
+                    });
+                }
                 
-                // 2. Kinokrad
-                playerSources.push({
-                    source: 'Kinokrad',
-                    iframeUrl: `https://kinokrad.co/search/${encodeURIComponent(title)}/`
-                });
+                // 2. 2embed
+                if (media.imdb_id) {
+                    playerSources.push({
+                        source: '2Embed',
+                        iframeUrl: `https://www.2embed.cc/embed/${media.imdb_id}`
+                    });
+                }
+                if (media.tmdb_id) {
+                    playerSources.push({
+                        source: '2Embed',
+                        iframeUrl: `https://www.2embed.cc/embedtmdb/movie?id=${media.tmdb_id}`
+                    });
+                }
                 
-                // 3. Seasonvar (сериалы)
-                playerSources.push({
-                    source: 'Seasonvar',
-                    iframeUrl: `http://seasonvar.ru/search?q=${encodeURIComponent(title)}`
-                });
+                // 3. SuperEmbed
+                if (media.imdb_id) {
+                    playerSources.push({
+                        source: 'SuperEmbed',
+                        iframeUrl: `https://multiembed.mov/?video_id=${media.imdb_id}&tmdb=1`
+                    });
+                }
                 
-                // 4. Zona
-                playerSources.push({
-                    source: 'Zona',
-                    iframeUrl: `https://w1.zona.plus/search/${encodeURIComponent(title)}`
-                });
+                // 4. NontonGo
+                if (media.tmdb_id) {
+                    playerSources.push({
+                        source: 'NontonGo',
+                        iframeUrl: `https://www.nontongo.win/embed/movie/${media.tmdb_id}`
+                    });
+                }
                 
-                // 5. Кинопоиск (легальный)
-                playerSources.push({
-                    source: 'Кинопоиск',
-                    iframeUrl: `https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(title)}`
-                });
+                // 5. Smashystream
+                if (media.imdb_id) {
+                    playerSources.push({
+                        source: 'Smashy',
+                        iframeUrl: `https://player.smashy.stream/movie/${media.imdb_id}`
+                    });
+                }
                 
-                // 6. YouTube трейлер
-                playerSources.push({
-                    source: 'YouTube',
-                    iframeUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' трейлер')}`
-                });
+                // 6. Autoembed
+                if (media.tmdb_id) {
+                    playerSources.push({
+                        source: 'AutoEmbed',
+                        iframeUrl: `https://autoembed.co/movie/tmdb/${media.tmdb_id}`
+                    });
+                }
+                
+                // Если нет ID - пробуем по названию через databasegdriveplayer
+                if (playerSources.length === 0) {
+                    playerSources.push({
+                        source: 'DBGdrive',
+                        iframeUrl: `https://databasegdriveplayer.co/search.php?search=${encodeURIComponent(title)}`
+                    });
+                }
                 
                 currentPlayers = playerSources;
                 
@@ -671,12 +703,14 @@
         
         function getSourceIcon(source) {
             const icons = {
-                'hdrezka': '🎬',
-                'kinokrad': '📺',
-                'seasonvar': '📺',
-                'zona': '🎥',
-                'кинопоиск': '⭐',
-                'youtube': '▶️'
+                'vidsrc': '🎬',
+                'vidsrc2': '🎬',
+                '2embed': '📺',
+                'superembed': '🎥',
+                'nontongo': '📽️',
+                'smashy': '🎞️',
+                'autoembed': '▶️',
+                'dbgdrive': '💾'
             };
             return icons[source.toLowerCase()] || '🎬';
         }
@@ -691,25 +725,20 @@
             document.querySelectorAll('.source-btn').forEach(b => b.classList.remove('active'));
             if (btn) btn.classList.add('active');
             
-            // Показываем информацию о выбранном источнике
-            playerPlaceholder.style.display = 'flex';
-            playerPlaceholder.innerHTML = `
-                <span class="player-placeholder-icon">🎬</span>
-                <p style="margin-bottom: 15px;">Нажмите кнопку для открытия</p>
-                <a href="${player.iframeUrl}" target="_blank" 
-                   style="background: var(--accent-color); color: white; padding: 15px 30px; 
-                          border-radius: 10px; text-decoration: none; font-weight: bold;
-                          display: inline-block;">
-                    ▶️ Открыть ${player.source}
-                </a>
-                <p style="margin-top: 15px; font-size: 12px; color: var(--text-secondary);">
-                    Откроется в новой вкладке
-                </p>
-            `;
+            // Скрываем placeholder
+            playerPlaceholder.style.display = 'none';
             
-            // Remove old iframe if any
+            // Remove old iframe
             const oldIframe = playerContainer.querySelector('iframe');
             if (oldIframe) oldIframe.remove();
+            
+            // Create new iframe
+            const iframe = document.createElement('iframe');
+            iframe.src = player.iframeUrl;
+            iframe.allowFullscreen = true;
+            iframe.allow = 'autoplay; fullscreen; encrypted-media; picture-in-picture';
+            iframe.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;border:none;';
+            playerContainer.appendChild(iframe);
         }
         
         // Favorites
