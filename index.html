@@ -598,81 +598,66 @@
                 // Список iframe балансеров (работают внутри Telegram)
                 const playerSources = [];
                 
-                // Определяем тип контента для URL
+                // Определяем тип контента
                 const isTV = media.type === 'tv' || media.type === 'series';
-                const contentType = isTV ? 'tv' : 'movie';
+                const kpId = media.kinopoisk_id;
                 
-                // 1. VidSrc.to - основной источник
-                if (media.tmdb_id) {
+                // === РУССКИЕ ИСТОЧНИКИ (по Kinopoisk ID) ===
+                
+                // 1. Kinobase - публичный iframe
+                if (kpId) {
                     playerSources.push({
-                        source: 'VidSrc',
-                        iframeUrl: `https://vidsrc.to/embed/${contentType}/${media.tmdb_id}`
+                        source: 'Kinobase',
+                        iframeUrl: `https://kinobase.org/embed/${kpId}`
                     });
                 }
                 
-                // 2. VidSrc.xyz
-                if (media.imdb_id) {
+                // 2. CDNmovies - работает без токена
+                if (kpId) {
                     playerSources.push({
-                        source: 'VidSrc2',
-                        iframeUrl: `https://vidsrc.xyz/embed/${contentType}/${media.imdb_id}`
+                        source: 'CDNmovies',
+                        iframeUrl: `https://cdnmovies.net/api/iframe/${kpId}`
                     });
                 }
                 
-                // 3. 2embed
-                if (media.tmdb_id) {
+                // 3. Videoframe
+                if (kpId) {
                     playerSources.push({
-                        source: '2Embed',
-                        iframeUrl: `https://www.2embed.cc/embedtmdb/${contentType}?id=${media.tmdb_id}`
+                        source: 'VideoFrame',
+                        iframeUrl: `https://videoframe.space/embed/${kpId}`
                     });
                 }
                 
-                // 4. SuperEmbed / MultiEmbed
-                if (media.tmdb_id) {
+                // 4. Kinoprofi
+                if (kpId) {
                     playerSources.push({
-                        source: 'SuperEmbed',
-                        iframeUrl: `https://multiembed.mov/?video_id=${media.tmdb_id}&tmdb=1`
+                        source: 'KinoProfi',
+                        iframeUrl: `https://kinoprofi.vip/embed/kp/${kpId}`
                     });
                 }
                 
-                // 5. Embedsu
-                if (media.tmdb_id) {
+                // 5. HDVB без токена
+                if (kpId) {
                     playerSources.push({
-                        source: 'EmbedSu',
-                        iframeUrl: `https://embed.su/embed/${contentType}/${media.tmdb_id}`
+                        source: 'HDVB',
+                        iframeUrl: `https://vid1732386508.vb17120ayeshas.pw/embed/${kpId}`
                     });
                 }
                 
-                // 6. Autoembed
-                if (media.tmdb_id) {
-                    playerSources.push({
-                        source: 'AutoEmbed',
-                        iframeUrl: `https://autoembed.co/${contentType}/tmdb/${media.tmdb_id}`
-                    });
-                }
+                // === ССЫЛКИ НА САЙТЫ (открываются в новой вкладке) ===
+                // Эти варианты как fallback - откроют страницу поиска
                 
-                // 7. MoviesAPI
-                if (media.tmdb_id) {
-                    playerSources.push({
-                        source: 'MoviesAPI',
-                        iframeUrl: `https://moviesapi.club/${contentType}/${media.tmdb_id}`
-                    });
-                }
+                playerSources.push({
+                    source: 'HDRezka',
+                    iframeUrl: `https://hdrezka.ag/search/?do=search&subaction=search&q=${encodeURIComponent(title)}`,
+                    external: true
+                });
                 
-                // Если нет TMDB ID но есть IMDB
-                if (playerSources.length === 0 && media.imdb_id) {
-                    playerSources.push({
-                        source: '2Embed',
-                        iframeUrl: `https://www.2embed.cc/embed/${media.imdb_id}`
-                    });
-                }
-                
-                // Если совсем нет ID - показываем сообщение
-                if (playerSources.length === 0) {
-                    playerSources.push({
-                        source: 'Поиск',
-                        iframeUrl: `https://www.google.com/search?q=${encodeURIComponent(title + ' смотреть онлайн')}&igu=1`
-                    });
-                }
+                playerSources.push({
+                    source: 'Кинопоиск',
+                    iframeUrl: `https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(title)}`,
+                    external: true
+                });
                 
                 currentPlayers = playerSources;
                 
@@ -711,16 +696,15 @@
         
         function getSourceIcon(source) {
             const icons = {
-                'vidsrc': '🎬',
-                'vidsrc2': '🎬',
-                '2embed': '📺',
-                'superembed': '🎥',
-                'embedsu': '📽️',
-                'autoembed': '▶️',
-                'moviesapi': '🎞️',
-                'поиск': '🔍'
+                'kinobase': '🎬',
+                'cdnmovies': '📺',
+                'videoframe': '🎥',
+                'kinoprofi': '⭐',
+                'hdvb': '📽️',
+                'hdrezka': '🔥',
+                'кинопоиск': '🎦'
             };
-            return icons[source.toLowerCase()] || '🎬';
+            return icons[source.toLowerCase()] || '▶️';
         }
         
         function playSource(player, btn) {
@@ -732,6 +716,23 @@
             // Update active button
             document.querySelectorAll('.source-btn').forEach(b => b.classList.remove('active'));
             if (btn) btn.classList.add('active');
+            
+            // Если внешняя ссылка - открываем в новой вкладке
+            if (player.external) {
+                playerPlaceholder.style.display = 'flex';
+                playerPlaceholder.innerHTML = `
+                    <span class="player-placeholder-icon">🔗</span>
+                    <p style="margin-bottom: 15px;">Откроется в браузере</p>
+                    <a href="${player.iframeUrl}" target="_blank" 
+                       style="background: var(--accent-color); color: white; padding: 15px 30px; 
+                              border-radius: 10px; text-decoration: none; font-weight: bold;">
+                        Открыть ${player.source}
+                    </a>
+                `;
+                const oldIframe = playerContainer.querySelector('iframe');
+                if (oldIframe) oldIframe.remove();
+                return;
+            }
             
             // Скрываем placeholder
             playerPlaceholder.style.display = 'none';
