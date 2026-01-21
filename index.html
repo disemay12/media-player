@@ -589,62 +589,50 @@
             
             movieInfo.classList.add('active');
             
-            // Load players - используем несколько источников
+            // Load players - используем рабочие источники
             try {
                 currentPlayers = [];
                 const title = media.title || '';
                 const kpId = media.kinopoisk_id;
                 
-                // Список источников плееров (iframe URL)
+                // Список рабочих источников плееров
                 const playerSources = [];
                 
-                // 1. Alloha - популярный балансер
-                if (kpId) {
-                    playerSources.push({
-                        source: 'Alloha',
-                        iframeUrl: `https://api.alloha.tv/?kp=${kpId}`
-                    });
-                }
-                
-                // 2. Collaps - работает по названию
+                // 1. Rezka (HDRezka) - через зеркало
                 playerSources.push({
-                    source: 'Collaps',
-                    iframeUrl: `https://api.collaps.cc/movie?name=${encodeURIComponent(title)}`
+                    source: 'HDRezka',
+                    iframeUrl: `https://hdrezka.ag/search/?do=search&subaction=search&q=${encodeURIComponent(title)}`
                 });
                 
-                // 3. Videocdn
-                if (kpId) {
-                    playerSources.push({
-                        source: 'VideoCDN',
-                        iframeUrl: `https://videocdn.tv/api/short?api_token=YfTMaA4cCvjvHqQgrgBpCuDYzrgVJP4R&kinopoisk_id=${kpId}`
-                    });
-                }
-                
-                // 4. HDVB
-                if (kpId) {
-                    playerSources.push({
-                        source: 'HDVB',
-                        iframeUrl: `https://hdvb.co/video?kp=${kpId}`
-                    });
-                }
-                
-                // 5. Kodik (по названию)
+                // 2. Kinoogo
                 playerSources.push({
-                    source: 'Kodik',
-                    iframeUrl: `https://kodikapi.com/search?token=447d179e875efe44217f20d1ee2146be&title=${encodeURIComponent(title)}&with_episodes=true`
+                    source: 'Kinoogo',
+                    iframeUrl: `https://kinoogo.net/search/${encodeURIComponent(title)}`
                 });
                 
-                // 6. VoKino
+                // 3. Lordfilm
                 playerSources.push({
-                    source: 'VoKino',
-                    iframeUrl: `https://vokino.tv/search?q=${encodeURIComponent(title)}`
+                    source: 'Lordfilm',
+                    iframeUrl: `https://lordfilm.tw/search/${encodeURIComponent(title)}`
+                });
+                
+                // 4. Kinogo
+                playerSources.push({
+                    source: 'Kinogo',
+                    iframeUrl: `https://kinogo.fm/search/${encodeURIComponent(title)}`
+                });
+                
+                // 5. Filmix
+                playerSources.push({
+                    source: 'Filmix',
+                    iframeUrl: `https://filmix.fm/search/${encodeURIComponent(title)}`
                 });
                 
                 currentPlayers = playerSources;
                 
                 if (currentPlayers.length > 0) {
                     displaySources(currentPlayers);
-                    // Пробуем первый плеер
+                    // Показываем первый плеер
                     playSource(currentPlayers[0]);
                 } else {
                     showError('Плееры не найдены. Попробуйте другое название.');
@@ -677,14 +665,12 @@
         
         function getSourceIcon(source) {
             const icons = {
-                'alloha': '🎬',
-                'videocdn': '📺',
-                'videoCDN': '📺',
-                'kodik': '🎥',
-                'collaps': '🎞️',
-                'hdvb': '📽️',
-                'bazon': '🎦',
-                'vokino': '🎦'
+                'hdrezka': '🎬',
+                'kinoogo': '📺',
+                'lordfilm': '🎥',
+                'kinogo': '🎞️',
+                'filmix': '📽️',
+                'rezka': '🎬'
             };
             return icons[source.toLowerCase()] || '▶️';
         }
