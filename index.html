@@ -843,25 +843,44 @@
         favoriteBtn.addEventListener('click', toggleFavorite);
         shareBtn.addEventListener('click', shareMedia);
         
-        // Init from URL params
+        // Init from URL params (supports both ? and # for Telegram Web App)
         (function init() {
-            const fullUrl = window.location.href;
-            const params = new URLSearchParams(window.location.search);
+            console.log('=== Web App Init ===');
+            console.log('Full URL:', window.location.href);
+            console.log('Search:', window.location.search);
+            console.log('Hash:', window.location.hash);
             
-            // Auto-search from params
+            // Пробуем получить параметры из hash (для Telegram) или из query
+            let paramsString = '';
+            
+            if (window.location.hash && window.location.hash.length > 1) {
+                // Параметры в hash: #title=...&tmdb=...
+                paramsString = window.location.hash.substring(1);
+                console.log('Using hash params');
+            } else if (window.location.search && window.location.search.length > 1) {
+                // Параметры в query: ?title=...&tmdb=...
+                paramsString = window.location.search.substring(1);
+                console.log('Using query params');
+            }
+            
+            if (!paramsString) {
+                console.log('No params found, waiting for search');
+                return;
+            }
+            
+            const params = new URLSearchParams(paramsString);
+            
             const kpId = params.get('kp');
             const imdbId = params.get('imdb');
             const tmdbId = params.get('tmdb');
             const title = params.get('title');
             const mediaType = params.get('type') || 'movie';
             
-            // Показываем URL для отладки
-            console.log('Full URL:', fullUrl);
-            console.log('Params:', {kpId, imdbId, tmdbId, title, mediaType});
+            console.log('Parsed params:', {kpId, imdbId, tmdbId, title, mediaType});
             
-            // Если есть параметры - загружаем фильм
+            // Если есть хоть какие-то данные - загружаем
             if (title || kpId || imdbId || tmdbId) {
-                const decodedTitle = title ? decodeURIComponent(title) : 'Загрузка...';
+                const decodedTitle = title ? decodeURIComponent(title.replace(/\+/g, ' ')) : 'Загрузка...';
                 
                 const media = {
                     kinopoisk_id: kpId ? parseInt(kpId) : null,
@@ -873,30 +892,11 @@
                 
                 console.log('Loading media:', media);
                 
-                // Заполняем поле поиска названием
+                // Заполняем поле поиска
                 document.getElementById('searchInput').value = decodedTitle;
                 
-                // Сразу загружаем фильм
+                // Загружаем фильм
                 selectMedia(media);
-            } else {
-                // Показываем отладочную информацию
-                console.log('No params found');
-                console.log('Search string:', window.location.search);
-                
-                // Если URL содержит параметры после # (Telegram иногда так делает)
-                if (window.location.hash && window.location.hash.includes('?')) {
-                    const hashParams = new URLSearchParams(window.location.hash.split('?')[1]);
-                    const hashTitle = hashParams.get('title');
-                    if (hashTitle) {
-                        document.getElementById('searchInput').value = decodeURIComponent(hashTitle);
-                        selectMedia({
-                            title: decodeURIComponent(hashTitle),
-                            tmdb_id: hashParams.get('tmdb') ? parseInt(hashParams.get('tmdb')) : null,
-                            imdb_id: hashParams.get('imdb'),
-                            type: hashParams.get('type') || 'movie'
-                        });
-                    }
-                }
             }
         })();
     </script>
