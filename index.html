@@ -513,33 +513,63 @@
             return params.get('api') || 'https://kinobox.tv/api';
         }
         
-        // Search
+        // TMDB API Key (публичный, для поиска)
+        const TMDB_API_KEY = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI2ZjRlZjc1YWY0MjMwZTBjZTM1MzBiMjI4YTY2ZTk2ZCIsInN1YiI6IjY1YjJkMTlkYTBmNWQ0MDE3YmM0ZjI1YyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.H0r_kcJtLqMvBDWFT2HJkL8prPoLZrqJ8LqY6v5bPpY';
+        
+        // Search via TMDB API
         async function search(query) {
             showLoading(true);
             hideError();
             
             try {
-                // Пробуем Kinobox API
                 let data = [];
                 
+                // Поиск через TMDB API (работает стабильно)
                 try {
-                    const response = await fetch(`https://kinobox.tv/api/search?query=${encodeURIComponent(query)}`);
-                    const text = await response.text();
+                    const response = await fetch(
+                        `https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(query)}&language=ru-RU`,
+                        {
+                            headers: {
+                                'Authorization': `Bearer ${TMDB_API_KEY}`,
+                                'Content-Type': 'application/json'
+                            }
+                        }
+                    );
                     
-                    // Проверяем, что это JSON
-                    if (text.startsWith('[') || text.startsWith('{')) {
-                        data = JSON.parse(text);
+                    if (response.ok) {
+                        const tmdbData = await response.json();
+                        
+                        // Преобразуем результаты TMDB в наш формат
+                        for (const item of (tmdbData.results || []).slice(0, 10)) {
+                            if (item.media_type !== 'movie' && item.media_type !== 'tv') continue;
+                            
+                            const mediaItem = {
+                                tmdb_id: item.id,
+                                title: item.title || item.name,
+                                title_original: item.original_title || item.original_name,
+                                year: (item.release_date || item.first_air_date || '').substring(0, 4),
+                                type: item.media_type === 'tv' ? 'tv' : 'movie',
+                                poster: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
+                                rating: item.vote_average,
+                                description: item.overview,
+                                imdb_id: null,
+                                kinopoisk_id: null
+                            };
+                            
+                            data.push(mediaItem);
+                        }
                     }
                 } catch (e) {
-                    console.log('Kinobox search failed, trying direct player lookup');
+                    console.log('TMDB search failed:', e);
                 }
                 
-                // Если Kinobox не вернул результаты, создаём заглушку для прямого поиска плеера
+                // Если TMDB не вернул результаты, создаём заглушку
                 if (!data || data.length === 0) {
                     data = [{
                         title: query,
                         year: '',
                         type: 'movie',
+                        tmdb_id: null,
                         kinopoisk_id: null,
                         imdb_id: null
                     }];
@@ -574,6 +604,31 @@
             searchResults.classList.add('active');
         }
         
+        // Получить IMDB ID через TMDB API
+        async function getExternalIds(tmdbId, mediaType) {
+            if (!tmdbId) return {};
+            
+            try {
+                const endpoint = mediaType === 'tv' ? 'tv' : 'movie';
+                const response = await fetch(
+                    `https://api.themoviedb.org/3/${endpoint}/${tmdbId}/external_ids`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${TMDB_API_KEY}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+                
+                if (response.ok) {
+                    return await response.json();
+                }
+            } catch (e) {
+                console.log('Failed to get external IDs:', e);
+            }
+            return {};
+        }
+        
         // Select Media
         async function selectMedia(media) {
             currentMedia = media;
@@ -582,9 +637,9 @@
             
             // Update movie info
             document.getElementById('movieTitle').textContent = media.title || 'Без названия';
-            document.getElementById('movieMeta').textContent = `${media.year || ''} • ${media.type === 'series' ? 'Сериал' : 'Фильм'}`;
+            document.getElementById('movieMeta').textContent = `${media.year || ''} • ${media.type === 'series' || media.type === 'tv' ? 'Сериал' : 'Фильм'}`;
             document.getElementById('moviePoster').src = media.poster || 'https://via.placeholder.com/100x150?text=No+Image';
-            document.getElementById('movieRating').textContent = '⭐ ' + (media.rating || 'N/A');
+            document.getElementById('movieRating').textContent = '⭐ ' + (media.rating ? parseFloat(media.rating).toFixed(1) : 'N/A');
             document.getElementById('movieDescription').textContent = media.description || '';
             
             movieInfo.classList.add('active');
@@ -593,16 +648,24 @@
             try {
                 currentPlayers = [];
                 const title = media.title || '';
-                const kpId = media.kinopoisk_id;
                 
                 // Список iframe балансеров (работают внутри Telegram)
                 const playerSources = [];
                 
-                // Определяем тип контента
+                // Определяем тип контента и ID
                 const isTV = media.type === 'tv' || media.type === 'series';
-                const kpId = media.kinopoisk_id;
-                const tmdbId = media.tmdb_id;
-                const imdbId = media.imdb_id;
+                let kpId = media.kinopoisk_id;
+                let tmdbId = media.tmdb_id;
+                let imdbId = media.imdb_id;
+                
+                // Если есть TMDB ID, но нет IMDB — получаем через API
+                if (tmdbId && !imdbId) {
+                    console.log('Fetching IMDB ID from TMDB...');
+                    const externalIds = await getExternalIds(tmdbId, media.type);
+                    imdbId = externalIds.imdb_id || null;
+                    media.imdb_id = imdbId;
+                    console.log('Got IMDB ID:', imdbId);
+                }
                 
                 console.log('Building players for:', {kpId, tmdbId, imdbId, title, isTV});
                 
@@ -612,43 +675,72 @@
                 if (tmdbId) {
                     const contentType = isTV ? 'tv' : 'movie';
                     
+                    // VidSrc.xyz — один из самых стабильных
                     playerSources.push({
                         source: 'VidSrc',
+                        iframeUrl: `https://vidsrc.xyz/embed/${contentType}/${tmdbId}`
+                    });
+                    
+                    // VidSrc.to — альтернативный домен
+                    playerSources.push({
+                        source: 'VidSrc2',
                         iframeUrl: `https://vidsrc.to/embed/${contentType}/${tmdbId}`
                     });
                     
+                    // Embed.su
                     playerSources.push({
                         source: 'Embed',
                         iframeUrl: `https://embed.su/embed/${contentType}/${tmdbId}`
                     });
                     
+                    // SuperEmbed / MultiEmbed
                     playerSources.push({
                         source: 'SuperEmbed',
                         iframeUrl: `https://multiembed.mov/?video_id=${tmdbId}&tmdb=1`
                     });
+                    
+                    // Autoembed
+                    playerSources.push({
+                        source: 'AutoEmbed',
+                        iframeUrl: `https://autoembed.co/${contentType}/tmdb/${tmdbId}`
+                    });
                 }
                 
                 if (imdbId) {
+                    // 2Embed по IMDB
                     playerSources.push({
                         source: '2Embed',
                         iframeUrl: `https://www.2embed.cc/embed/${imdbId}`
                     });
+                    
+                    // VidSrc по IMDB
+                    if (!tmdbId) {
+                        playerSources.push({
+                            source: 'VidSrc',
+                            iframeUrl: `https://vidsrc.xyz/embed/movie/${imdbId}`
+                        });
+                    }
                 }
                 
                 // === РУССКИЕ ИСТОЧНИКИ (по Kinopoisk ID) ===
                 if (kpId) {
+                    playerSources.push({
+                        source: 'Alloha',
+                        iframeUrl: `https://api.alloha.tv/?kp=${kpId}`
+                    });
+                    
                     playerSources.push({
                         source: 'Kinobase',
                         iframeUrl: `https://kinobase.org/embed/${kpId}`
                     });
                     
                     playerSources.push({
-                        source: 'VideoFrame',
-                        iframeUrl: `https://videoframe.space/embed/${kpId}`
+                        source: 'Collaps',
+                        iframeUrl: `https://api.collaps.ws/embed/movie/${kpId}`
                     });
                 }
                 
-                // === ССЫЛКИ НА САЙТЫ (открываются в новой вкладке) ===
+                // === ССЫЛКИ НА САЙТЫ (открываются в браузере) ===
                 playerSources.push({
                     source: 'HDRezka',
                     iframeUrl: `https://hdrezka.ag/search/?do=search&subaction=search&q=${encodeURIComponent(title)}`,
@@ -656,8 +748,8 @@
                 });
                 
                 playerSources.push({
-                    source: 'Кинопоиск',
-                    iframeUrl: `https://www.kinopoisk.ru/index.php?kp_query=${encodeURIComponent(title)}`,
+                    source: 'Lordfilm',
+                    iframeUrl: `https://lordfilm.lu/search/${encodeURIComponent(title)}`,
                     external: true
                 });
                 
@@ -701,13 +793,16 @@
         function getSourceIcon(source) {
             const icons = {
                 'vidsrc': '🎬',
+                'vidsrc2': '🎬',
                 'embed': '📺',
                 'superembed': '🎥',
+                'autoembed': '🤖',
                 '2embed': '📽️',
+                'alloha': '🇷🇺',
                 'kinobase': '🇷🇺',
-                'videoframe': '🇷🇺',
+                'collaps': '🇷🇺',
                 'hdrezka': '🔥',
-                'кинопоиск': '⭐'
+                'lordfilm': '🎞️'
             };
             return icons[source.toLowerCase()] || '▶️';
         }
@@ -875,19 +970,27 @@
             const tmdbId = params.get('tmdb');
             const title = params.get('title');
             const mediaType = params.get('type') || 'movie';
+            const year = params.get('year') || '';
+            const poster = params.get('poster') || '';
+            const rating = params.get('rating') || '';
             
-            console.log('Parsed params:', {kpId, imdbId, tmdbId, title, mediaType});
+            console.log('Parsed params:', {kpId, imdbId, tmdbId, title, mediaType, year, poster, rating});
             
             // Если есть хоть какие-то данные - загружаем
             if (title || kpId || imdbId || tmdbId) {
                 const decodedTitle = title ? decodeURIComponent(title.replace(/\+/g, ' ')) : 'Загрузка...';
+                const decodedPoster = poster ? decodeURIComponent(poster.replace(/\+/g, ' ')) : null;
                 
                 const media = {
                     kinopoisk_id: kpId ? parseInt(kpId) : null,
                     imdb_id: imdbId || null,
                     tmdb_id: tmdbId ? parseInt(tmdbId) : null,
                     title: decodedTitle,
-                    type: mediaType
+                    type: mediaType,
+                    year: year,
+                    poster: decodedPoster,
+                    rating: rating ? parseFloat(rating) : null,
+                    description: ''
                 };
                 
                 console.log('Loading media:', media);
